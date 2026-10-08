@@ -391,6 +391,20 @@ class MiniMaxH3Shot:
                 ),
             },
             "optional": {
+                "shot_seed": (
+                    "INT",
+                    {
+                        "default": -1,
+                        "min": -1,
+                        "max": 0xFFFFFFFFFFFFFFFF,
+                        "control_after_generate": "fixed",
+                        "tooltip": "MiniMax H3 Long Shot only: this Shot's own seed. "
+                        "-1 follows Long Shot's seed (base + Shot number - 1). Set a "
+                        "number to re-roll just this Shot. Ignored by the prompt "
+                        "builders. Named shot_seed so seed broadcasters like Seed "
+                        "Everywhere leave it alone.",
+                    },
+                ),
                 "shots": ("MMH3_SHOTS", {"tooltip": "Chain from the previous "
                                          "Shot node. Leave empty on shot 1."}),
             },
@@ -401,12 +415,13 @@ class MiniMaxH3Shot:
     FUNCTION = "add"
     CATEGORY = "MiniMax H3"
 
-    def add(self, cut_verb, seconds, text, shots=None):
+    def add(self, cut_verb, seconds, text, shots=None, shot_seed=-1):
         chain = list(shots) if shots else []
         chain.append({
             "seconds": float(seconds),
             "text": _clean(text),
             "cut_verb": cut_verb,
+            "seed": int(shot_seed),
         })
         return (chain,)
 
@@ -778,10 +793,24 @@ class MiniMaxH3RefPromptBuilder:
             },
         }
 
-    RETURN_TYPES = ("STRING", "FLOAT", "INT")
-    RETURN_NAMES = ("prompt", "total_seconds", "frames")
+    RETURN_TYPES = ("STRING", "FLOAT", "INT", "MMH3_LONGSHOT")
+    RETURN_NAMES = ("prompt", "total_seconds", "frames", "long_shot")
+    OUTPUT_TOOLTIPS = (
+        "The assembled prompt.",
+        "Total length of the Shot chain.",
+        "Total length in frames, snapped to 17n+5 at 24fps.",
+        "Everything on this node plus the Shot chain, for MiniMax H3 Long Shot. Long Shot "
+        "builds one prompt per Shot from it.",
+    )
     FUNCTION = "build"
     CATEGORY = "MiniMax H3"
+
+    def _task_list(self, selected):
+        kept = []
+        for name in selected:
+            if name and name != NONE_OPTION and name not in kept:
+                kept.append(name)
+        return kept or ["reference generation"]
 
     def _format_task_prefix(self, selected):
         """Keep the selected order, drop blanks and repeats."""
@@ -837,7 +866,20 @@ class MiniMaxH3RefPromptBuilder:
             "non_diegetic_music:\n"
             + _default_na(_strip_field_prefix(non_diegetic_music, "non_diegetic_music")),
         ]
-        return ("\n\n".join(parts), total, _snap_frames(total))
+        custom_prefix = summary_text.startswith("[")
+        long_shot = {
+            "version": 1,
+            "subject_definitions": subjects_text,
+            "summary": summary_text,
+            # None means the summary carries its own [prefix], kept verbatim
+            "task_types": None if custom_prefix else self._task_list(selected),
+            "retention_analysis": retention_text,
+            "style_line": style,
+            "overall_soundscape": _strip_field_prefix(overall_soundscape, "overall_soundscape"),
+            "non_diegetic_music": _strip_field_prefix(non_diegetic_music, "non_diegetic_music"),
+            "shots": list(shots) if shots else [],
+        }
+        return ("\n\n".join(parts), total, _snap_frames(total), long_shot)
 
 
 # ==========================================================================
