@@ -47,7 +47,7 @@ Shot → Shot → Shot → Assemble → prompt / total_seconds / frames
 
 ```
 Subject → Subject ─┐
-                   ├→ Ref Prompt Builder r2v → prompt / total_seconds / frames
+                   ├→ Ref Prompt Builder r2v → prompt / total_seconds / frames / long_shot
 Shot → Shot ───────┘
 ```
 
@@ -63,6 +63,12 @@ node mid-chain renumbers everything downstream.
 
 Two buttons under the text box wrap a highlighted selection in `<d>[English]
 ...</d>` or in double quotes for on-screen text.
+
+`shot_seed` is only used by [MiniMax H3 Long Shot](https://github.com/r34vtraining/H3_Longshot),
+where each Shot is its own generation. Leave it at -1 to follow Long Shot's seed,
+or set a number to re-roll just that Shot. The prompt builders ignore it. It's
+named `shot_seed` so broadcasters like Seed Everywhere, which feed every input
+called `seed`, don't overwrite it.
 
 ### MiniMax H3 Assemble
 Terminates a Shot chain. `mode` picks T2VA / I2VA / FL2VA / L2VA and the right
@@ -82,6 +88,10 @@ from an image, motion from a video.
 The six sections in fixed spec order. `subjects` and `shots` chain inputs
 override their text boxes when connected. Three ordered `task_type` dropdowns
 build the bracketed summary prefix.
+
+The `long_shot` output carries everything on this node plus the Shot chain, for
+the **MiniMax H3 Long Shot** node in the separate Long Shot pack. Long Shot builds
+one prompt per Shot from it. The other three outputs are unchanged.
 
 ### MiniMax H3 Multi Shot Builder
 Fixed eight-slot alternative to the Shot chain, with one global cut verb.
